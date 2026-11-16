@@ -93,10 +93,10 @@ nohup python3 quic_protocol_server.py --ip 40.1.1.10 --port 4433 \
 
 Run this from the directory containing the aioquic example `server.py`.
 
-If using a local `quic_server.py` wrapper, check its supported arguments:
+If using a local `quic_protocol_server.py` wrapper, check its supported arguments:
 
 ```bash
-python3 quic_server.py --help
+python3 quic_protocol_server.py --help
 ```
 
 The exact CLI options depend on the server script/version.
