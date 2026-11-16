@@ -56,7 +56,6 @@ def hkdf_expand_label(secret, label, length):
 
 def extract_client_hello(pcap_file):
     packets = rdpcap(pcap_file)
-
     streams = {}
 
     # Collect TCP payloads by TCP connection
@@ -81,9 +80,7 @@ def extract_client_hello(pcap_file):
 
         key = (src, tcp.sport, dst, tcp.dport)
 
-        streams.setdefault(key, []).append(
-            (tcp.seq, payload)
-        )
+        streams.setdefault(key, []).append((tcp.seq, payload))
 
     # Reassemble each TCP stream and search for TLS ClientHello
     for key, segments in streams.items():
@@ -157,7 +154,47 @@ def extract_client_hello(pcap_file):
     raise ValueError("No complete TLS ClientHello found in the PCAP")
 
 
-def build_quic_initial(client_hello):
+def build_crypto_frames(client_hello, chunks):
+    """Split ClientHello into multiple CRYPTO frames with consecutive offsets."""
+
+    if chunks < 1:
+        raise ValueError("--crypto-chunks must be at least 1")
+
+    if chunks > len(client_hello):
+        raise ValueError(
+            f"--crypto-chunks cannot exceed ClientHello length "
+            f"({len(client_hello)} bytes)"
+        )
+
+    frames = bytearray()
+
+    # Distribute bytes evenly, including any remainder
+    base_size, remainder = divmod(len(client_hello), chunks)
+
+    offset = 0
+
+    for i in range(chunks):
+        chunk_size = base_size + (1 if i < remainder else 0)
+        chunk = client_hello[offset:offset + chunk_size]
+
+        # CRYPTO frame:
+        # Type 0x06 | Offset | Length | Data
+        frames.append(0x06)
+        frames.extend(encode_varint(offset))
+        frames.extend(encode_varint(len(chunk)))
+        frames.extend(chunk)
+
+        print(
+            f"CRYPTO frame {i + 1}/{chunks}: "
+            f"Offset={offset}, Length={len(chunk)}"
+        )
+
+        offset += len(chunk)
+
+    return bytes(frames)
+
+
+def build_quic_initial(client_hello, crypto_chunks=1):
     # Generate connection IDs
     dcid = secrets.token_bytes(8)
     scid = secrets.token_bytes(8)
@@ -177,13 +214,9 @@ def build_quic_initial(client_hello):
     iv = hkdf_expand_label(client_secret, b"quic iv", 12)
     hp = hkdf_expand_label(client_secret, b"quic hp", 16)
 
-    # QUIC CRYPTO frame:
-    # Type 0x06 | Offset 0 | Length | ClientHello
-    crypto_frame = (
-        b"\x06"
-        + encode_varint(0)
-        + encode_varint(len(client_hello))
-        + client_hello
+    # Build one or more CRYPTO frames
+    crypto_frames = build_crypto_frames(
+        client_hello, crypto_chunks
     )
 
     packet_number = 0
@@ -205,7 +238,6 @@ def build_quic_initial(client_hello):
 
         # Length includes packet number and AEAD tag
         packet_length = 1 + len(plaintext) + 16
-
         header_prefix += encode_varint(packet_length)
 
         # Packet number is part of the authenticated header
@@ -247,7 +279,7 @@ def build_quic_initial(client_hello):
     padding = 0
 
     while True:
-        plaintext = crypto_frame + (b"\x00" * padding)
+        plaintext = crypto_frames + (b"\x00" * padding)
         packet = create_packet(plaintext)
 
         if len(packet) >= 1200:
@@ -258,6 +290,7 @@ def build_quic_initial(client_hello):
     print(f"QUIC Initial packet size: {len(packet)} bytes")
     print(f"QUIC DCID: {dcid.hex()}")
     print(f"QUIC SCID: {scid.hex()}")
+    print(f"Total CRYPTO frames: {crypto_chunks}")
 
     return packet
 
@@ -268,8 +301,20 @@ def main():
     )
 
     parser.add_argument("--ip", required=True, help="Destination IP")
-    parser.add_argument("--port", type=int, default=443, help="Destination UDP port")
-    parser.add_argument("--client-hello", required=True, help="Source TLS PCAP")
+    parser.add_argument(
+        "--port", type=int, default=443,
+        help="Destination UDP port"
+    )
+    parser.add_argument(
+        "--client-hello", required=True,
+        help="Source TLS PCAP"
+    )
+    parser.add_argument(
+        "--crypto-chunks",
+        type=int,
+        default=1,
+        help="Number of CRYPTO frames in the same QUIC Initial packet (default: 1)"
+    )
 
     args = parser.parse_args()
 
@@ -279,7 +324,10 @@ def main():
 
     print("Building QUIC Initial packet...")
 
-    quic_packet = build_quic_initial(client_hello)
+    quic_packet = build_quic_initial(
+        client_hello,
+        crypto_chunks=args.crypto_chunks
+    )
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
