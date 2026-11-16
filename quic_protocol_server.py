@@ -7,15 +7,15 @@ from aioquic.quic.configuration import QuicConfiguration
 from aioquic.h3.connection import H3_ALPN
 
 
-async def main(ip, port):
+async def main(ip, port, certificate, private_key):
     configuration = QuicConfiguration(
         is_client=False,
         alpn_protocols=H3_ALPN
     )
 
     configuration.load_cert_chain(
-        certfile="quic.crt",
-        keyfile="quic.key"
+        certfile=certificate,
+        keyfile=private_key
     )
 
     await serve(
@@ -34,7 +34,9 @@ if __name__ == "__main__":
 
     parser.add_argument("--ip", required=True, help="IP address to listen on")
     parser.add_argument("--port", type=int, default=443, help="Listening UDP port (default: 443)")
+    parser.add_argument("--certificate", default="quic.crt", help="Path to the certificate file (default: quic.crt)")
+    parser.add_argument("--private-key", default="quic.key", help="Path to the private key file (default: quic.key)")
 
     args = parser.parse_args()
 
-    asyncio.run(main(args.ip, args.port))
+    asyncio.run(main(args.ip, args.port, args.certificate, args.private_key))
