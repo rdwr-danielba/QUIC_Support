@@ -87,7 +87,7 @@ Using the aioquic example server:
 ```bash
 python3 quic_protocol_server.py --ip 40.1.1.10 --port 4433 \
   --certificate ~/quic-server/server.crt \
-  --private-key ~/quic-server/server.key
+  --private-key ~/quic-server/server.key &
 ```
 
 Run this from the directory containing the aioquic example `server.py`.
