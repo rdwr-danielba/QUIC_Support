@@ -85,7 +85,7 @@ Make sure any external firewall also allows UDP/4433.
 Using the aioquic example server:
 
 ```bash
-python3 server.py --host 0.0.0.0 --port 4433 \
+python3 quic_protocol_server.py --ip 40.1.1.10 --port 4433 \
   --certificate ~/quic-server/server.crt \
   --private-key ~/quic-server/server.key
 ```
