@@ -315,6 +315,20 @@ def main():
         default=1,
         help="Number of CRYPTO frames in the same QUIC Initial packet (default: 1)"
     )
+    parser.add_argument(
+        "--isLoop",
+        type=lambda v: v.lower() in ("true", "1", "yes"),
+        default=False,
+        help="If True, continuously send packets at --rate packets/second. "
+             "If False, send the packet --rate times (default: False)"
+    )
+    parser.add_argument(
+        "--rate",
+        type=float,
+        default=1,
+        help="If --isLoop is True: packets per second to send. "
+             "If --isLoop is False: number of times to send the packet (default: 1)"
+    )
 
     args = parser.parse_args()
 
@@ -333,10 +347,47 @@ def main():
 
     try:
         sock.connect((args.ip, args.port))
-        sock.send(quic_packet)
 
-        print(f"Sent {len(quic_packet)} bytes to {args.ip}:{args.port}")
-        print("QUIC Initial transmission completed.")
+        if args.isLoop:
+            if args.rate <= 0:
+                raise ValueError("--rate must be > 0 when --isLoop is True")
+
+            interval = 1.0 / args.rate
+
+            print(
+                f"Looping: sending to {args.ip}:{args.port} "
+                f"at {args.rate} packets/sec (Ctrl+C to stop)"
+            )
+
+            sent = 0
+
+            try:
+                while True:
+                    start = time.perf_counter()
+
+                    sock.send(quic_packet)
+                    sent += 1
+
+                    if sent % max(int(args.rate), 1) == 0:
+                        print(f"Sent {sent} packets so far...")
+
+                    elapsed = time.perf_counter() - start
+                    sleep_time = interval - elapsed
+
+                    if sleep_time > 0:
+                        time.sleep(sleep_time)
+
+            except KeyboardInterrupt:
+                print(f"\nStopped. Total packets sent: {sent}")
+
+        else:
+            count = max(int(args.rate), 1)
+
+            for i in range(count):
+                sock.send(quic_packet)
+                print(f"Sent packet {i + 1}/{count} ({len(quic_packet)} bytes) to {args.ip}:{args.port}")
+
+            print("QUIC Initial transmission completed.")
 
     finally:
         sock.close()
