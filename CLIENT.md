@@ -36,7 +36,7 @@ All other imports (`argparse`, `socket`, `secrets`, `hmac`, `hashlib`, `time`) a
 ## Usage
 
 ```bash
-python quic_protocol_client.py --ip <destination_ip> --client-hello <path_to_pcap> [options]
+python3 quic_protocol_client.py --ip <destination_ip> --client-hello <path_to_pcap> [options]
 ```
 
 ### Required Flags
@@ -59,22 +59,22 @@ python quic_protocol_client.py --ip <destination_ip> --client-hello <path_to_pca
 
 **Send a single QUIC Initial packet to 93.184.216.34 on port 443:**
 ```bash
-python quic_protocol_client.py --ip 93.184.216.34 --client-hello capture.pcap
+python3 quic_protocol_client.py --ip 93.184.216.34 --client-hello capture.pcap
 ```
 
 **Send the packet 10 times (burst mode):**
 ```bash
-python quic_protocol_client.py --ip 93.184.216.34 --client-hello capture.pcap --rate 10
+python3 quic_protocol_client.py --ip 93.184.216.34 --client-hello capture.pcap --rate 10
 ```
 
 **Continuously send 50 packets per second:**
 ```bash
-python quic_protocol_client.py --ip 93.184.216.34 --client-hello capture.pcap --isLoop True --rate 50
+python3 quic_protocol_client.py --ip 93.184.216.34 --client-hello capture.pcap --isLoop True --rate 50
 ```
 
 **Split the ClientHello into 3 CRYPTO frames and target a custom port:**
 ```bash
-python quic_protocol_client.py --ip 10.0.0.5 --port 8443 --client-hello capture.pcap --crypto-chunks 3
+python3 quic_protocol_client.py --ip 10.0.0.5 --port 8443 --client-hello capture.pcap --crypto-chunks 3
 ```
 
 ## How It Works (Technical Details)
